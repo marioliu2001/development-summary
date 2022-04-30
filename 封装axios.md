@@ -328,5 +328,86 @@ server:
 
 * springboot 整合 redis
 
+待...
 
+# 三、docker部署
+
+* 后端Dockerfile
+
+```xml
+FROM maven:3.5-jdk-8-alpine as builder #从中央pull需要支持项目的镜像
+FROM openjdk:8 #用这个
+
+# Copy local code to the container image.
+WORKDIR /app 	#项目工作目录
+COPY pom.xml . 	#复制pom.xml到app目录中
+COPY src ./src 	#复制src到app/src目录中
+
+# Build a release artifact.
+RUN mvn package -DskipTests 	#执行maven打包命令
+
+# Run the web service on container startup.
+CMD ["java","-jar","/app/target/user-center-backend-0.0.1-SNAPSHOT.jar","--spring.profiles.active=prod"]
+```
+
+* 前端Dockerfile
+
+```xml
+FROM nginx
+
+WORKDIR /usr/share/nginx/html/ #工作目录
+USER root
+
+COPY ./docker/nginx.conf /etc/nginx/conf.d/default.conf # /docker/nginx.conf 这个就是把前端整体目录中的/docker/nginx.conf，所以要创建个docker目录，将nginx.conf放在里面
+
+COPY ./dist  /usr/share/nginx/html/ 	#将前端打包的dist目录下的东西，映射到nginx下html目录
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]  #构建后自己run进行启动
+```
+
+* nginx.conf
+
+```xml
+server {
+    listen 80;
+
+    # gzip config
+    gzip on;
+    gzip_min_length 1k;
+    gzip_comp_level 9;
+    gzip_types text/plain text/css text/javascript application/json application/javascript application/x-javascript application/xml;
+    gzip_vary on;
+    gzip_disable "MSIE [1-6]\.";
+
+    root /usr/share/nginx/html;
+    include /etc/nginx/mime.types;
+
+    location / {
+        try_files $uri /index.html;  #配合vue路由去找静态资源
+    }
+
+}
+```
+
+* docker build
+
+```xml
+# 后端 - 构建镜像，这最后一个点 . 是当前目录下的 Dockerfile
+docker build -t user-center-backend:v0.0.1 .
+
+# 前端
+docker build -t user-center-front:v0.0.1 .
+```
+
+* docker 启动
+
+```xml
+# 前端
+docker run -p 80:80 -d user-center-front:v0.0.1
+
+# 后端
+docker run -p 8080:8080 -d user-center-backend:v0.0.1
+```
 
